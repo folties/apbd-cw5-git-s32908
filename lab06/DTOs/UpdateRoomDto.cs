@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace lab06.DTOs;
 
-public class CreateRoomDto
+public class UpdateRoomDto
 {
     [Required]
     public string Name { get; set; } = string.Empty;

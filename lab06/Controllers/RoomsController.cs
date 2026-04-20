@@ -9,57 +9,110 @@ namespace lab06.Controllers
     [ApiController]
     public class RoomsController : ControllerBase
     {
-        public static List<Room> rooms = new List<Room>()
-        {
-            new Room() { Id = 1, BuildingCode = 1, Name = "Simple" },
-            new Room() { Id = 2, BuildingCode = 2, Name = "Luxury" },
-            new Room() { Id = 3, BuildingCode = 3, Name = "Middle" }
-        };
         
         [HttpGet]
-        public IActionResult Get([FromQuery] int? id = 0)
+        public IActionResult GetRooms([FromQuery] int? minCapacity, [FromQuery] bool? hasProjector,
+            bool? isActive)
         {
-            //200 OK
-            return Ok(rooms.Where(r => r.Id >= id));
+            var rooms = DataStore.Rooms.Where(r =>
+                (minCapacity is null || r.Capacity >= minCapacity) &&
+                (hasProjector is null || r.HasProjector == hasProjector) &&
+                (isActive is null || r.IsActive == isActive)
+            );
             
-            //404 NotFound
-            return NotFound();
+            if (!rooms.Any())
+            {
+                return NotFound("No rooms found");
+            }
+
+            return Ok(rooms);
         }
         
-        //GET api/rooms/{id}
-        //GET api/rooms/1
-        [HttpGet("{buildingCode}")]
-        public IActionResult Get([FromRoute] int buildingCode)
+        [HttpGet("{id:int}")]
+        public IActionResult GetById([FromRoute] int id)
         {
-            
-            var room = rooms.FirstOrDefault(r => r.BuildingCode == buildingCode);
+            var room = DataStore.Rooms.FirstOrDefault(r => r.Id == id);
 
             if (room == null)
             {
-                return NotFound();
+                return NotFound("No room with the provided id found");
             }
             
-            //200 OK
             return Ok(room);
-            
-            //404 NotFound
-            //return NotFound();
         }
         
-        //POST api/rooms {"name": "Luxury", "BuildingCode": 12 }
+        [HttpGet("building/{buildingCode}")]
+        public IActionResult GetAllByBuildingCode([FromRoute] string buildingCode)
+        {
+
+            var rooms = DataStore.Rooms.Where(r => r.BuildingCode == buildingCode);
+            
+            if (!rooms.Any())
+            {
+                return NotFound("No rooms with a provided building code found");
+            }
+            
+            return Ok(rooms);
+        }
+        
         [HttpPost]
         public IActionResult Post([FromBody] CreateRoomDto createRoomDto)
         {
             var room = new Room()
             {
-                Id = rooms.Count + 1,
+                Id = DataStore.Rooms.Count + 1,
                 Name = createRoomDto.Name,
                 BuildingCode = createRoomDto.BuildingCode,
+                Floor = createRoomDto.Floor,
+                Capacity = createRoomDto.Capacity,
+                HasProjector = createRoomDto.HasProjector,
+                IsActive = createRoomDto.IsActive
             };
             
-            rooms.Add(room);
+            DataStore.Rooms.Add(room);
             
-            return CreatedAtAction(nameof(Get), new { id = room.Id }, room);
+            return CreatedAtAction(nameof(GetById), new { id = room.Id }, room);
+        }
+
+        [HttpPut("{id:int}")]
+        public IActionResult Put([FromRoute] int id, [FromBody] UpdateRoomDto updateRoomDto)
+        {
+            var room = DataStore.Rooms.FirstOrDefault(r => r.Id == id);
+
+            if (room == null)
+            {
+                return NotFound("Room with provided id does not exist");
+            }
+
+            room.Name = updateRoomDto.Name;
+            room.BuildingCode = updateRoomDto.BuildingCode;
+            room.Floor = updateRoomDto.Floor;
+            room.Capacity = updateRoomDto.Capacity;
+            room.HasProjector = updateRoomDto.HasProjector;
+            room.IsActive = updateRoomDto.IsActive;
+            
+            return Ok(room);
+        }
+
+        [HttpDelete("{id:int}")]
+        public IActionResult Delete([FromRoute] int id)
+        {
+            var room = DataStore.Rooms.FirstOrDefault(r => r.Id == id);
+            if (room == null)
+            {
+                return NotFound("Room with provided id does not exist");
+            }
+            
+            bool hasReservations = DataStore.Reservations.Any(r => r.Id == id);
+
+            if (hasReservations)
+            {
+                return Conflict("Room can not be deleted, future reservations exists");
+            }
+            
+            DataStore.Rooms.Remove(room);
+            
+            return NoContent();
         }
     }
 }
